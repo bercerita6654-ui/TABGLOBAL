@@ -1,0 +1,6 @@
+{
+  "name": "Pemenang Lucky Draw TAB 2026",
+  "description": "Galeri pemenang Lucky Draw TAB 2026 dari Google Sheets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
