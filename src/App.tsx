@@ -23,9 +23,16 @@ function extractDriveId(url: string) {
 
 export default function App() {
   const [winners, setWinners] = useState<Winner[]>([]);
+  const [filterDate, setFilterDate] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [selectedWinner, setSelectedWinner] = useState<Winner | null>(null);
+
+  const uniqueDates = Array.from(new Set(winners.map(w => w.date)));
+
+  const filteredWinners = filterDate === 'all' 
+    ? winners 
+    : winners.filter(w => w.date === filterDate);
 
   const loadData = useCallback(() => {
     setLoading(true);
@@ -84,7 +91,16 @@ export default function App() {
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-semibold text-slate-800">Daftar pemenang saat ini</h2>
             <div className="flex gap-3">
-              <button className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium shadow-sm hover:bg-slate-50 transition-colors">Semua Periode</button>
+              <select 
+                className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium shadow-sm hover:bg-slate-50 transition-colors"
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+              >
+                <option value="all">Semua Tanggal</option>
+                {uniqueDates.map(date => (
+                  <option key={date} value={date}>{date}</option>
+                ))}
+              </select>
               <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium shadow-md shadow-blue-200">Pemenang Utama</button>
             </div>
           </div>
@@ -92,14 +108,14 @@ export default function App() {
         </div>
         {loading && <LoadingState />}
         {error && <ErrorState loadData={loadData} />}
-        {!loading && !error && winners.length === 0 && (
+        {!loading && !error && filteredWinners.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20">
             <ImageOff className="w-16 h-16 text-gray-400 mb-4" />
             <h2 className="text-xl font-medium text-gray-600">Belum ada data pemenang</h2>
           </div>
         )}
-        {!loading && !error && winners.length > 0 && (
-          <GalleryMarquee winners={winners} openModal={setSelectedWinner} />
+        {!loading && !error && filteredWinners.length > 0 && (
+          <GalleryMarquee winners={filteredWinners} openModal={setSelectedWinner} />
         )}
       </main>
       <ImageModal winner={selectedWinner} closeModal={() => setSelectedWinner(null)} />
