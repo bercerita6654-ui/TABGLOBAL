@@ -59,7 +59,10 @@ export default function App() {
               secondaryImgUrl: driveId ? `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000` : '',
             };
           });
-        const sortedWinners = processedWinners.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        const uniqueWinners = Array.from(new Map(processedWinners.map(w => [w.driveLink, w])).values());
+        const sortedWinners = uniqueWinners.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
         setWinners(sortedWinners);
       },
       error: () => {
