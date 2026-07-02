@@ -11,6 +11,7 @@ import LoadingState from './components/LoadingState';
 import ErrorState from './components/ErrorState';
 import GalleryMarquee from './components/GalleryMarquee';
 import ImageModal from './components/ImageModal';
+import DailyWinnerSummary from './components/DailyWinnerSummary';
 import { ImageOff } from 'lucide-react';
 
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQs-HvfOGc1iH5Y-5sV3HyDUt3TB0fO7FAF-f5XhqDIaHeH70WcAJ6bA8pL9yW4SvY4Gok32M0fI4Kz/pub?gid=0&single=true&output=csv';
@@ -76,12 +77,15 @@ export default function App() {
     <div className="bg-slate-50 min-h-screen text-slate-900">
       <Header loadData={loadData} winnerCount={winners.length} />
       <main className="max-w-7xl mx-auto p-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-semibold text-slate-800">Daftar pemenang saat ini</h2>
-          <div className="flex gap-3">
-            <button className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium shadow-sm hover:bg-slate-50 transition-colors">Semua Periode</button>
-            <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium shadow-md shadow-blue-200">Pemenang Utama</button>
+        <div className="flex flex-col mb-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold text-slate-800">Daftar pemenang saat ini</h2>
+            <div className="flex gap-3">
+              <button className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium shadow-sm hover:bg-slate-50 transition-colors">Semua Periode</button>
+              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium shadow-md shadow-blue-200">Pemenang Utama</button>
+            </div>
           </div>
+          <DailyWinnerSummary winners={winners} />
         </div>
         {loading && <LoadingState />}
         {error && <ErrorState loadData={loadData} />}
