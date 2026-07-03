@@ -13,7 +13,7 @@ import GalleryMarquee from './components/GalleryMarquee';
 import ImageModal from './components/ImageModal';
 import DailyWinnerSummary from './components/DailyWinnerSummary';
 import ThemeSelector, { ThemeType } from './components/ThemeSelector';
-import { ImageOff, Pencil, Ruler, Clipboard, StickyNote, Pin } from 'lucide-react';
+import { ImageOff, Pencil, Ruler, Clipboard, StickyNote, Pin, Gift, Minimize2 } from 'lucide-react';
 
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQs-HvfOGc1iH5Y-5sV3HyDUt3TB0fO7FAF-f5XhqDIaHeH70WcAJ6bA8pL9yW4SvY4Gok32M0fI4Kz/pub?gid=0&single=true&output=csv';
 
@@ -31,10 +31,21 @@ export default function App() {
   const [theme, setTheme] = useState<ThemeType>(() => {
     return (localStorage.getItem('theme-stationery') as ThemeType) || 'blue';
   });
+  const [isTheaterMode, setIsTheaterMode] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('theme-stationery', theme);
   }, [theme]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsTheaterMode(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const uniqueDates = Array.from(new Set(winners.map(w => w.date)));
 
@@ -103,7 +114,7 @@ export default function App() {
 
   return (
     <div className={`min-h-screen text-slate-900 transition-all duration-500 overflow-x-hidden relative pb-12 ${getThemePatternClass()}`}>
-      <Header loadData={loadData} winnerCount={winners.length} />
+      <Header loadData={loadData} winnerCount={winners.length} isTheaterMode={isTheaterMode} setIsTheaterMode={setIsTheaterMode} />
 
       {/* Decorative Floating Stationery Elements (hidden on small screens, absolutely gorgeous on large screens) */}
       <div className="absolute inset-y-0 left-0 right-0 pointer-events-none select-none z-0 overflow-hidden">
@@ -173,6 +184,86 @@ export default function App() {
         )}
       </main>
       <ImageModal winner={selectedWinner} closeModal={() => setSelectedWinner(null)} />
+
+      {/* Immersive Simulated Fullscreen / Presentation View Overlay */}
+      {isTheaterMode && (
+        <div className="fixed inset-0 z-[100] bg-[#0b1329] text-white flex flex-col justify-between p-6 md:p-10 transition-all duration-300 overflow-y-auto">
+          {/* Header of Presentation */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-6 shrink-0 z-[101]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <Gift className="text-white w-5 h-5 animate-bounce" />
+              </div>
+              <div>
+                <h1 className="text-xl md:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                  TAB 2026 LUCKY DRAW
+                  <span className="text-[10px] bg-red-500 text-white font-extrabold uppercase px-2 py-0.5 rounded-full tracking-widest animate-pulse shrink-0">
+                    ● PRESENTASI LIVE
+                  </span>
+                </h1>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">Global Mart Winner Showcase</p>
+              </div>
+            </div>
+
+            <div className="flex items-center flex-wrap gap-3 w-full sm:w-auto">
+              {/* Date selection inside presentation */}
+              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 w-full sm:w-auto">
+                <span className="text-xs text-slate-400 font-medium whitespace-nowrap">Filter Tanggal:</span>
+                <select 
+                  className="bg-transparent text-white border-none text-xs font-semibold cursor-pointer outline-none w-full sm:w-auto"
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                >
+                  <option value="all" className="bg-slate-900 text-white">Semua Tanggal</option>
+                  {uniqueDates.map(date => (
+                    <option key={date} value={date} className="bg-slate-900 text-white">{date}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Exit Button */}
+              <button 
+                onClick={() => setIsTheaterMode(false)}
+                className="flex items-center justify-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-red-900/30 w-full sm:w-auto"
+              >
+                <Minimize2 className="w-4 h-4" />
+                <span>Keluar (Esc)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Immersive Marquee Core in Presentation Mode */}
+          <div className="flex-1 flex flex-col justify-center py-6 md:py-12 overflow-hidden z-[101]">
+            {filteredWinners.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 bg-white/5 rounded-3xl border border-white/10 p-8">
+                <ImageOff className="w-16 h-16 text-slate-500 mb-4" />
+                <h2 className="text-xl font-medium text-slate-300">Belum ada data pemenang untuk tanggal ini</h2>
+              </div>
+            ) : (
+              <div className="w-full relative scale-100 md:scale-105 transition-transform duration-500">
+                {/* Visual indicators */}
+                <div className="absolute -top-10 left-4 text-xs font-semibold tracking-wider text-slate-400 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping"></span>
+                  GALERI PEMENANG ({filteredWinners.length} orang)
+                </div>
+                <GalleryMarquee winners={filteredWinners} openModal={setSelectedWinner} />
+              </div>
+            )}
+          </div>
+
+          {/* Footer with Info & Dynamic Instruction */}
+          <div className="border-t border-white/10 pt-4 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-400 shrink-0 font-medium z-[101]">
+            <p className="text-center md:text-left text-slate-500">
+              Tip: Jika mode layar penuh terblokir oleh sandboxed iframe, gunakan tombol <span className="text-blue-400 font-bold">Open in new tab</span> di kanan atas editor, lalu aktifkan mode presentasi untuk layar penuh seutuhnya.
+            </p>
+            <div className="text-slate-400 bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg flex items-center gap-2 font-mono text-[10px]">
+              <span>TOTAL DATA: {winners.length}</span>
+              <span className="text-slate-600">|</span>
+              <span>FILTERED: {filteredWinners.length}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

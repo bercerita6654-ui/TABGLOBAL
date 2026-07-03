@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Gift, RefreshCw, Maximize2, Minimize2 } from 'lucide-react';
 
-export default function Header({ loadData, winnerCount }: { loadData: () => void, winnerCount: number }) {
+interface HeaderProps {
+  loadData: () => void;
+  winnerCount: number;
+  isTheaterMode: boolean;
+  setIsTheaterMode: (val: boolean) => void;
+}
+
+export default function Header({ loadData, winnerCount, isTheaterMode, setIsTheaterMode }: HeaderProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -13,16 +20,22 @@ export default function Header({ loadData, winnerCount }: { loadData: () => void
   }, []);
 
   const toggleFullscreen = async () => {
+    // 1. Toggle simulated full screen / theater mode (works in any sandbox/iframe)
+    setIsTheaterMode(!isTheaterMode);
+
+    // 2. Attempt native full screen as progressive enhancement
     try {
       if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
+        if (document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+        }
       } else {
         if (document.exitFullscreen) {
           await document.exitFullscreen();
         }
       }
     } catch (err) {
-      console.warn("Fullscreen request failed or was blocked:", err);
+      console.warn("Fullscreen request failed or was blocked inside iframe context. Using simulated presentation mode.", err);
     }
   };
 
@@ -44,18 +57,18 @@ export default function Header({ loadData, winnerCount }: { loadData: () => void
         <div className="flex items-center gap-2">
           <button 
             onClick={toggleFullscreen} 
-            title={isFullscreen ? "Keluar Layar Penuh" : "Mode Layar Penuh (Presentasi)"} 
+            title={isTheaterMode || isFullscreen ? "Keluar Layar Penuh" : "Mode Layar Penuh (Presentasi)"} 
             className="p-2 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors flex items-center justify-center gap-1.5 font-medium text-xs px-3"
           >
-            {isFullscreen ? (
+            {isTheaterMode || isFullscreen ? (
               <>
                 <Minimize2 className="w-4 h-4" />
-                <span className="hidden sm:inline">Normal</span>
+                <span className="hidden sm:inline font-bold">Keluar Presentasi</span>
               </>
             ) : (
               <>
                 <Maximize2 className="w-4 h-4" />
-                <span className="hidden sm:inline">Presentasi</span>
+                <span className="hidden sm:inline font-bold">Mode Presentasi</span>
               </>
             )}
           </button>
