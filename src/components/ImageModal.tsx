@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Winner } from '../types';
+import confetti from 'canvas-confetti';
 
 interface ImageModalProps {
   winner: Winner | null;
@@ -7,6 +9,49 @@ interface ImageModalProps {
 }
 
 export default function ImageModal({ winner, closeModal }: ImageModalProps) {
+  useEffect(() => {
+    if (winner) {
+      // 1. Initial big blast from the center
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 0.6 },
+        colors: ['#3b82f6', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899']
+      });
+
+      // 2. Sequential side cannons for continuous celebration
+      const duration = 1.5 * 1000;
+      const end = Date.now() + duration;
+
+      const frame = () => {
+        confetti({
+          particleCount: 3,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0, y: 0.85 },
+          colors: ['#3b82f6', '#f59e0b', '#ef4444']
+        });
+        confetti({
+          particleCount: 3,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1, y: 0.85 },
+          colors: ['#10b981', '#8b5cf6', '#ec4899']
+        });
+
+        if (Date.now() < end) {
+          requestAnimationFrame(frame);
+        }
+      };
+
+      const timeoutId = setTimeout(() => {
+        frame();
+      }, 200);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [winner]);
+
   if (!winner) return null;
 
   const fallbackImage = `https://placehold.co/600x1066/f3f4f6/a1a1aa?text=Privasi+Akun/File+Dibatasi`;
