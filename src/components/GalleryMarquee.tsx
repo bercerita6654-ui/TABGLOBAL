@@ -10,14 +10,15 @@ interface GalleryMarqueeProps {
 }
 
 export default function GalleryMarquee({ winners, openModal }: GalleryMarqueeProps) {
-  const [speed, setSpeed] = useState(275); // default: 275 seconds
+  const [speed, setSpeed] = useState(450); // default: 450 seconds (very slow and elegant)
   const duplicatedWinners = [...winners, ...winners];
 
   const presets = [
     { label: 'Cepat (100s)', value: 100 },
-    { label: 'Sedang (200s)', value: 200 },
-    { label: 'Lambat (275s - Default)', value: 275 },
-    { label: 'Sangat Lambat (300s)', value: 300 },
+    { label: 'Sedang (250s)', value: 250 },
+    { label: 'Lambat (450s - Default)', value: 450 },
+    { label: 'Sangat Lambat (650s)', value: 650 },
+    { label: 'Sangat Tenang (900s)', value: 900 },
   ];
 
   return (
@@ -30,7 +31,7 @@ export default function GalleryMarquee({ winners, openModal }: GalleryMarqueePro
           </div>
           <div>
             <h3 className="text-sm font-semibold text-slate-800">Kecepatan Putar Preview</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Atur kelambatan perputaran foto otomatis ({speed} detik per siklus)</p>
+            <p className="text-xs text-slate-500 mt-0.5">Atur kelambatan perputaran foto otomatis ({speed} detik per siklus). Arahkan kursor ke foto untuk menjeda.</p>
           </div>
         </div>
 
@@ -41,7 +42,7 @@ export default function GalleryMarquee({ winners, openModal }: GalleryMarqueePro
               <button
                 key={preset.value}
                 onClick={() => setSpeed(preset.value)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer ${
                   speed === preset.value
                     ? 'bg-white text-blue-600 shadow-sm font-semibold'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/50'
@@ -58,8 +59,8 @@ export default function GalleryMarquee({ winners, openModal }: GalleryMarqueePro
             <input
               type="range"
               min="100"
-              max="300"
-              step="5"
+              max="1000"
+              step="10"
               value={speed}
               onChange={(e) => setSpeed(Number(e.target.value))}
               className="w-full accent-blue-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg appearance-none"

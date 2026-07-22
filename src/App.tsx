@@ -10,16 +10,63 @@ import Header from './components/Header';
 import LoadingState from './components/LoadingState';
 import ErrorState from './components/ErrorState';
 import GalleryMarquee from './components/GalleryMarquee';
+import WinnerListView from './components/WinnerListView';
 import ImageModal from './components/ImageModal';
 import DailyWinnerSummary from './components/DailyWinnerSummary';
+import SpotlightWinner from './components/SpotlightWinner';
 import ThemeSelector, { ThemeType } from './components/ThemeSelector';
-import { ImageOff, Pencil, Ruler, Clipboard, StickyNote, Pin, Gift, Minimize2 } from 'lucide-react';
+import { ImageOff, Pencil, Ruler, Clipboard, StickyNote, Pin, Gift, Minimize2, Calendar, Eye, LayoutGrid, List } from 'lucide-react';
 
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQs-HvfOGc1iH5Y-5sV3HyDUt3TB0fO7FAF-f5XhqDIaHeH70WcAJ6bA8pL9yW4SvY4Gok32M0fI4Kz/pub?gid=0&single=true&output=csv';
 
 function extractDriveId(url: string) {
   const match = url.match(/[-\w]{25,}/);
   return match ? match[0] : null;
+}
+
+function normalizeDateOnly(rawDate: string): string {
+  if (!rawDate) return 'Tanggal tidak diketahui';
+  const trimmed = rawDate.trim();
+
+  // Extract the date part before any space or 'T' (ignoring hours/minutes/seconds)
+  const datePart = trimmed.split(/[ T]/)[0];
+
+  // If in DD/MM/YYYY format (common in Indonesian spreadsheets), parse it manually
+  const slashParts = datePart.split('/');
+  if (slashParts.length === 3) {
+    let day = slashParts[0].padStart(2, '0');
+    let month = slashParts[1].padStart(2, '0');
+    let year = slashParts[2];
+    if (year.length === 2) year = '20' + year;
+    return `${year}-${month}-${day}`;
+  }
+
+  // If in DD-MM-YYYY format, parse it manually
+  const dashParts = datePart.split('-');
+  if (dashParts.length === 3) {
+    let part1 = dashParts[0];
+    let part2 = dashParts[1];
+    let part3 = dashParts[2];
+    if (part1.length === 4) {
+      return `${part1}-${part2.padStart(2, '0')}-${part3.padStart(2, '0')}`;
+    } else {
+      let year = part3;
+      if (year.length === 2) year = '20' + year;
+      return `${year}-${part2.padStart(2, '0')}-${part1.padStart(2, '0')}`;
+    }
+  }
+
+  // Fallback to JS Date parsing if possible
+  const parsed = Date.parse(datePart);
+  if (!isNaN(parsed)) {
+    const d = new Date(parsed);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  return datePart;
 }
 
 export default function App() {
@@ -32,6 +79,8 @@ export default function App() {
     return (localStorage.getItem('theme-stationery') as ThemeType) || 'blue';
   });
   const [isTheaterMode, setIsTheaterMode] = useState(false);
+  const [viewMode, setViewMode] = useState<'all' | 'today'>('all');
+  const [displayMode, setDisplayMode] = useState<'marquee' | 'list'>('marquee');
 
   useEffect(() => {
     localStorage.setItem('theme-stationery', theme);
@@ -49,9 +98,19 @@ export default function App() {
 
   const uniqueDates = Array.from(new Set(winners.map(w => w.date)));
 
-  const filteredWinners = filterDate === 'all' 
-    ? winners 
-    : winners.filter(w => w.date === filterDate);
+  const todayStr = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD
+  const latestDate = uniqueDates[0] || '';
+  const todayDate = uniqueDates.includes(todayStr) ? todayStr : latestDate;
+
+  const filteredWinners = winners.filter(w => {
+    if (viewMode === 'today') {
+      return w.date === todayDate;
+    }
+    if (filterDate !== 'all') {
+      return w.date === filterDate;
+    }
+    return true;
+  });
 
   const loadData = useCallback(() => {
     setLoading(true);
@@ -77,7 +136,7 @@ export default function App() {
             const driveLink = row[2].trim();
             const driveId = extractDriveId(driveLink);
             return {
-              date: row[0]?.trim() || 'Tanggal tidak diketahui',
+              date: normalizeDateOnly(row[0]),
               name: row[1]?.trim() || 'Tanpa Nama',
               driveLink,
               driveId,
@@ -114,7 +173,7 @@ export default function App() {
 
   return (
     <div className={`min-h-screen text-slate-900 transition-all duration-500 overflow-x-hidden relative pb-12 ${getThemePatternClass()}`}>
-      <Header loadData={loadData} winnerCount={winners.length} isTheaterMode={isTheaterMode} setIsTheaterMode={setIsTheaterMode} />
+      <Header loadData={loadData} winners={winners} isTheaterMode={isTheaterMode} setIsTheaterMode={setIsTheaterMode} />
 
       {/* Decorative Floating Stationery Elements (hidden on small screens, absolutely gorgeous on large screens) */}
       <div className="absolute inset-y-0 left-0 right-0 pointer-events-none select-none z-0 overflow-hidden">
@@ -148,22 +207,98 @@ export default function App() {
         <ThemeSelector currentTheme={theme} onChangeTheme={setTheme} />
 
         <div className="flex flex-col mb-6 mt-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <h2 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
               <Clipboard className="w-6 h-6 text-slate-600 shrink-0" />
               Daftar pemenang saat ini
             </h2>
-            <div className="flex gap-3">
-              <select 
-                className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium shadow-sm hover:bg-slate-50 transition-colors cursor-pointer outline-none focus:ring-2 focus:ring-blue-500/20"
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-              >
-                <option value="all">Semua Tanggal</option>
-                {uniqueDates.map(date => (
-                  <option key={date} value={date}>{date}</option>
-                ))}
-              </select>
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Segmented Control for View Mode: Hari Ini vs View All */}
+              <div className="flex bg-slate-200/60 p-1 rounded-xl border border-slate-200/30 shadow-inner shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('today')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    viewMode === 'today'
+                      ? 'bg-white text-blue-600 shadow-sm font-semibold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Hari Ini</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    viewMode === 'all'
+                      ? 'bg-white text-blue-600 shadow-sm font-semibold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+                  }`}
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Semua</span>
+                </button>
+              </div>
+
+              {/* Segmented Control for Layout Mode: Marquee vs List */}
+              <div className="flex bg-slate-200/60 p-1 rounded-xl border border-slate-200/30 shadow-inner shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setDisplayMode('marquee')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    displayMode === 'marquee'
+                      ? 'bg-white text-blue-600 shadow-sm font-semibold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+                  }`}
+                  title="Tampilan Marquee Berputar"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Marquee</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDisplayMode('list')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    displayMode === 'list'
+                      ? 'bg-white text-blue-600 shadow-sm font-semibold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+                  }`}
+                  title="Tampilan Kolom Daftar Kebawah"
+                >
+                  <List className="w-3.5 h-3.5" />
+                  <span>Daftar List</span>
+                </button>
+              </div>
+
+              {/* Date Selector Dropdown */}
+              <div className="relative">
+                <select 
+                  className={`px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium shadow-sm hover:bg-slate-50 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                    viewMode === 'today' ? 'opacity-60 pointer-events-none bg-slate-100 text-slate-400' : 'text-slate-700'
+                  }`}
+                  value={viewMode === 'today' ? todayDate : filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                  disabled={viewMode === 'today'}
+                >
+                  {viewMode === 'today' ? (
+                    <option value={todayDate}>{todayDate}</option>
+                  ) : (
+                    <>
+                      <option value="all">Pilih Tanggal (Semua)</option>
+                      {uniqueDates.map(date => (
+                        <option key={date} value={date}>{date}</option>
+                      ))}
+                    </>
+                  )}
+                </select>
+                {viewMode === 'today' && (
+                  <span className="absolute -top-2 -right-1 bg-blue-100 text-blue-700 font-extrabold text-[8px] px-1.5 py-0.5 rounded uppercase tracking-wider scale-75 border border-blue-200">
+                    Hari Ini
+                  </span>
+                )}
+              </div>
+
               <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium shadow-md shadow-blue-200 hover:bg-blue-700 transition-colors">
                 Pemenang Utama
               </button>
@@ -173,6 +308,9 @@ export default function App() {
         </div>
         {loading && <LoadingState />}
         {error && <ErrorState loadData={loadData} />}
+        {!loading && !error && filteredWinners.length > 0 && (
+          <SpotlightWinner filteredWinners={filteredWinners} onSelectWinner={setSelectedWinner} />
+        )}
         {!loading && !error && filteredWinners.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 bg-white/50 backdrop-blur-sm rounded-3xl border border-slate-200/50 p-8 shadow-sm">
             <ImageOff className="w-16 h-16 text-gray-400 mb-4" />
@@ -180,10 +318,19 @@ export default function App() {
           </div>
         )}
         {!loading && !error && filteredWinners.length > 0 && (
-          <GalleryMarquee winners={filteredWinners} openModal={setSelectedWinner} />
+          displayMode === 'list' ? (
+            <WinnerListView winners={filteredWinners} openModal={setSelectedWinner} />
+          ) : (
+            <GalleryMarquee winners={filteredWinners} openModal={setSelectedWinner} />
+          )
         )}
       </main>
-      <ImageModal winner={selectedWinner} closeModal={() => setSelectedWinner(null)} />
+      <ImageModal 
+        winner={selectedWinner} 
+        winners={filteredWinners} 
+        onWinnerChange={setSelectedWinner} 
+        closeModal={() => setSelectedWinner(null)} 
+      />
 
       {/* Immersive Simulated Fullscreen / Presentation View Overlay */}
       {isTheaterMode && (
@@ -206,18 +353,85 @@ export default function App() {
             </div>
 
             <div className="flex items-center flex-wrap gap-3 w-full sm:w-auto">
+              {/* Segmented Control inside Presentation Mode */}
+              <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('today')}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    viewMode === 'today'
+                      ? 'bg-blue-600 text-white shadow-sm font-semibold'
+                      : 'text-slate-300 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Hari Ini</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('all')}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    viewMode === 'all'
+                      ? 'bg-blue-600 text-white shadow-sm font-semibold'
+                      : 'text-slate-300 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Semua</span>
+                </button>
+              </div>
+
+              {/* Segmented Control for Layout Mode in Presentation */}
+              <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setDisplayMode('marquee')}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    displayMode === 'marquee'
+                      ? 'bg-blue-600 text-white shadow-sm font-semibold'
+                      : 'text-slate-300 hover:text-white hover:bg-white/5'
+                  }`}
+                  title="Tampilan Marquee Berputar"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Marquee</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDisplayMode('list')}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    displayMode === 'list'
+                      ? 'bg-blue-600 text-white shadow-sm font-semibold'
+                      : 'text-slate-300 hover:text-white hover:bg-white/5'
+                  }`}
+                  title="Tampilan Kolom Daftar Kebawah"
+                >
+                  <List className="w-3.5 h-3.5" />
+                  <span>Daftar List</span>
+                </button>
+              </div>
+
               {/* Date selection inside presentation */}
-              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 w-full sm:w-auto">
+              <div className={`flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 w-full sm:w-auto transition-all ${
+                viewMode === 'today' ? 'opacity-40 pointer-events-none' : ''
+              }`}>
                 <span className="text-xs text-slate-400 font-medium whitespace-nowrap">Filter Tanggal:</span>
                 <select 
                   className="bg-transparent text-white border-none text-xs font-semibold cursor-pointer outline-none w-full sm:w-auto"
-                  value={filterDate}
+                  value={viewMode === 'today' ? todayDate : filterDate}
                   onChange={(e) => setFilterDate(e.target.value)}
+                  disabled={viewMode === 'today'}
                 >
-                  <option value="all" className="bg-slate-900 text-white">Semua Tanggal</option>
-                  {uniqueDates.map(date => (
-                    <option key={date} value={date} className="bg-slate-900 text-white">{date}</option>
-                  ))}
+                  {viewMode === 'today' ? (
+                    <option value={todayDate} className="bg-slate-900 text-white">{todayDate}</option>
+                  ) : (
+                    <>
+                      <option value="all" className="bg-slate-900 text-white">Semua Tanggal</option>
+                      {uniqueDates.map(date => (
+                        <option key={date} value={date} className="bg-slate-900 text-white">{date}</option>
+                      ))}
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -232,21 +446,29 @@ export default function App() {
             </div>
           </div>
 
-          {/* Immersive Marquee Core in Presentation Mode */}
-          <div className="flex-1 flex flex-col justify-center py-6 md:py-12 overflow-hidden z-[101]">
+          {/* Immersive Marquee/List Core in Presentation Mode */}
+          <div className="flex-1 flex flex-col justify-center py-6 md:py-12 z-[101]">
             {filteredWinners.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 bg-white/5 rounded-3xl border border-white/10 p-8">
                 <ImageOff className="w-16 h-16 text-slate-500 mb-4" />
                 <h2 className="text-xl font-medium text-slate-300">Belum ada data pemenang untuk tanggal ini</h2>
               </div>
             ) : (
-              <div className="w-full relative scale-100 md:scale-105 transition-transform duration-500">
+              <div className="w-full relative scale-100 transition-transform duration-500 max-h-[70vh] overflow-y-auto pr-2">
                 {/* Visual indicators */}
-                <div className="absolute -top-10 left-4 text-xs font-semibold tracking-wider text-slate-400 flex items-center gap-2">
+                <div className="text-xs font-semibold tracking-wider text-slate-400 flex items-center gap-2 mb-4">
                   <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping"></span>
-                  GALERI PEMENANG ({filteredWinners.length} orang)
+                  {displayMode === 'list' ? 'DAFTAR TABEL PEMENANG' : 'GALERI PEMENANG'} ({filteredWinners.length} orang)
                 </div>
-                <GalleryMarquee winners={filteredWinners} openModal={setSelectedWinner} />
+                {displayMode === 'list' ? (
+                  <div className="bg-[#111c3a] border border-white/10 rounded-2xl overflow-hidden shadow-xl p-2">
+                    <WinnerListView winners={filteredWinners} openModal={setSelectedWinner} />
+                  </div>
+                ) : (
+                  <div className="scale-100 md:scale-105 transition-transform duration-500">
+                    <GalleryMarquee winners={filteredWinners} openModal={setSelectedWinner} />
+                  </div>
+                )}
               </div>
             )}
           </div>

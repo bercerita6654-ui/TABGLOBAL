@@ -14,6 +14,10 @@
   animation: marquee var(--marquee-duration, 30s) linear infinite;
 }
 
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
 /* Custom Stationery Background Patterns */
 .pattern-blue-grid {
   background-color: #f0f7ff;
