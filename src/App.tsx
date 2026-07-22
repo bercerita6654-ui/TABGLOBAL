@@ -24,49 +24,143 @@ function extractDriveId(url: string) {
   return match ? match[0] : null;
 }
 
+function formatDateToIndonesian(date: Date): string {
+  const indonesianDays = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const indonesianMonths = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+  const dayName = indonesianDays[date.getDay()];
+  const dayStr = String(date.getDate()).padStart(2, '0');
+  const monthName = indonesianMonths[date.getMonth()];
+  const year = date.getFullYear();
+  return `${dayName}, ${dayStr} ${monthName} ${year}`;
+}
+
 function normalizeDateOnly(rawDate: string): string {
   if (!rawDate) return 'Tanggal tidak diketahui';
   const trimmed = rawDate.trim();
 
-  // Extract the date part before any space or 'T' (ignoring hours/minutes/seconds)
-  const datePart = trimmed.split(/[ T]/)[0];
+  // Split tokens by space, ignoring parts containing colons (time parts)
+  let tokens = trimmed.split(/\s+/).filter(token => !token.includes(':'));
 
-  // If in DD/MM/YYYY format (common in Indonesian spreadsheets), parse it manually
-  const slashParts = datePart.split('/');
-  if (slashParts.length === 3) {
-    let day = slashParts[0].padStart(2, '0');
-    let month = slashParts[1].padStart(2, '0');
-    let year = slashParts[2];
-    if (year.length === 2) year = '20' + year;
-    return `${year}-${month}-${day}`;
-  }
+  const dayNames = [
+    'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu',
+    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+    'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'
+  ];
 
-  // If in DD-MM-YYYY format, parse it manually
-  const dashParts = datePart.split('-');
-  if (dashParts.length === 3) {
-    let part1 = dashParts[0];
-    let part2 = dashParts[1];
-    let part3 = dashParts[2];
-    if (part1.length === 4) {
-      return `${part1}-${part2.padStart(2, '0')}-${part3.padStart(2, '0')}`;
-    } else {
-      let year = part3;
-      if (year.length === 2) year = '20' + year;
-      return `${year}-${part2.padStart(2, '0')}-${part1.padStart(2, '0')}`;
+  // Filter out any day name words
+  tokens = tokens.filter(t => {
+    const cleanT = t.toLowerCase().replace(/[^a-z]/g, '');
+    return !dayNames.includes(cleanT);
+  });
+
+  let day = 0;
+  let monthIdx = -1; // 0-indexed month
+  let year = 0;
+
+  const monthNameToIdx: Record<string, number> = {
+    'jan': 0, 'januari': 0, 'january': 0,
+    'feb': 1, 'februari': 1, 'february': 1,
+    'mar': 2, 'maret': 2, 'march': 2,
+    'apr': 3, 'april': 3,
+    'mei': 4, 'may': 4,
+    'jun': 5, 'juni': 5, 'june': 5,
+    'jul': 6, 'juli': 6, 'july': 6,
+    'agu': 7, 'agustus': 7, 'aug': 7, 'august': 7,
+    'sep': 8, 'september': 8,
+    'okt': 9, 'oktober': 9, 'oct': 9, 'october': 9,
+    'nov': 10, 'november': 10,
+    'des': 11, 'desember': 11, 'dec': 11, 'december': 11
+  };
+
+  if (tokens.length === 1) {
+    const parts = tokens[0].split(/[/-]/);
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // YYYY-MM-DD or YYYY/MM/DD
+        year = parseInt(parts[0], 10);
+        monthIdx = parseInt(parts[1], 10) - 1;
+        day = parseInt(parts[2], 10);
+      } else {
+        // DD-MM-YYYY or DD/MM/YYYY
+        day = parseInt(parts[0], 10);
+        monthIdx = parseInt(parts[1], 10) - 1;
+        year = parseInt(parts[2], 10);
+        if (year < 100) year += 2000;
+      }
+    }
+  } else if (tokens.length === 3) {
+    tokens.forEach(t => {
+      const cleanT = t.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (/^\d{4}$/.test(cleanT)) {
+        year = parseInt(cleanT, 10);
+      } else if (/^[a-z]+$/.test(cleanT)) {
+        if (monthNameToIdx[cleanT] !== undefined) {
+          monthIdx = monthNameToIdx[cleanT];
+        }
+      } else if (/^\d{1,2}$/.test(cleanT)) {
+        day = parseInt(cleanT, 10);
+      }
+    });
+
+    // If monthIdx was not set because it's numeric, e.g. ["01", "07", "2026"]
+    if (monthIdx === -1) {
+      const numericTokens = tokens.map(t => parseInt(t.replace(/[^0-9]/g, ''), 10)).filter(num => !isNaN(num) && num < 100);
+      if (numericTokens.length === 2 && year > 0) {
+        // Assume DD MM YYYY
+        day = numericTokens[0];
+        monthIdx = numericTokens[1] - 1;
+      }
     }
   }
 
   // Fallback to JS Date parsing if possible
-  const parsed = Date.parse(datePart);
-  if (!isNaN(parsed)) {
-    const d = new Date(parsed);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+  if (!year || monthIdx === -1 || !day) {
+    const fallbackParsed = Date.parse(trimmed);
+    if (!isNaN(fallbackParsed)) {
+      const d = new Date(fallbackParsed);
+      year = d.getFullYear();
+      monthIdx = d.getMonth();
+      day = d.getDate();
+    }
   }
 
-  return datePart;
+  if (year > 0 && monthIdx >= 0 && monthIdx <= 11 && day > 0 && day <= 31) {
+    const finalDate = new Date(year, monthIdx, day);
+    const indonesianDays = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const indonesianMonths = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+
+    const dayName = indonesianDays[finalDate.getDay()];
+    const monthName = indonesianMonths[finalDate.getMonth()];
+    const dayStr = String(day).padStart(2, '0');
+
+    return `${dayName}, ${dayStr} ${monthName} ${year}`;
+  }
+
+  return trimmed;
+}
+
+export function parseIndonesianToDate(dateStr: string): number {
+  try {
+    const cleanStr = dateStr.includes(', ') ? dateStr.split(', ')[1] : dateStr;
+    const parts = cleanStr.split(' ');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const monthMap: Record<string, number> = {
+        'januari': 0, 'februari': 1, 'maret': 2, 'april': 3, 'mei': 4, 'juni': 5,
+        'juli': 6, 'agustus': 7, 'september': 8, 'oktober': 9, 'november': 10, 'desember': 11
+      };
+      const month = monthMap[parts[1].toLowerCase()] || 0;
+      const year = parseInt(parts[2], 10);
+      return new Date(year, month, day).getTime();
+    }
+  } catch {}
+  return 0;
 }
 
 export default function App() {
@@ -96,9 +190,10 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const uniqueDates = Array.from(new Set(winners.map(w => w.date)));
+  const uniqueDates = Array.from(new Set(winners.map(w => w.date)))
+    .sort((a: string, b: string) => parseIndonesianToDate(b) - parseIndonesianToDate(a));
 
-  const todayStr = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD
+  const todayStr = formatDateToIndonesian(new Date());
   const latestDate = uniqueDates[0] || '';
   const todayDate = uniqueDates.includes(todayStr) ? todayStr : latestDate;
 
@@ -146,7 +241,7 @@ export default function App() {
           });
         
         const uniqueWinners = Array.from(new Map(processedWinners.map(w => [w.driveLink, w])).values());
-        const sortedWinners = uniqueWinners.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const sortedWinners = uniqueWinners.sort((a, b) => parseIndonesianToDate(b.date) - parseIndonesianToDate(a.date));
         
         setWinners(sortedWinners);
       },

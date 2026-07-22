@@ -48,6 +48,24 @@ export default function Header({ loadData, winners, isTheaterMode, setIsTheaterM
     return acc;
   }, {} as Record<string, number>);
 
+  const parseIndonesianToDate = (dateStr: string) => {
+    try {
+      const cleanStr = dateStr.includes(', ') ? dateStr.split(', ')[1] : dateStr;
+      const parts = cleanStr.split(' ');
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const monthMap: Record<string, number> = {
+          'januari': 0, 'februari': 1, 'maret': 2, 'april': 3, 'mei': 4, 'juni': 5,
+          'juli': 6, 'agustus': 7, 'september': 8, 'oktober': 9, 'november': 10, 'desember': 11
+        };
+        const month = monthMap[parts[1].toLowerCase()] || 0;
+        const year = parseInt(parts[2], 10);
+        return new Date(year, month, day).getTime();
+      }
+    } catch {}
+    return 0;
+  };
+
   const dailyData = Object.entries(dailyCounts)
     .map(([date, count]) => ({
       date,
@@ -61,13 +79,26 @@ export default function Header({ loadData, winners, isTheaterMode, setIsTheaterM
             const monthIdx = parseInt(parts[1], 10) - 1;
             return `${day} ${months[monthIdx] || parts[1]}`;
           }
+          if (date.includes(', ')) {
+            const datePart = date.split(', ')[1];
+            const dateParts = datePart.split(' ');
+            if (dateParts.length === 3) {
+              const day = dateParts[0];
+              const monthMapShort: Record<string, string> = {
+                'januari': 'Jan', 'februari': 'Feb', 'maret': 'Mar', 'april': 'Apr', 'mei': 'Mei', 'juni': 'Jun',
+                'juli': 'Jul', 'agustus': 'Agu', 'september': 'Sep', 'oktober': 'Okt', 'november': 'Nov', 'desember': 'Des'
+              };
+              const monthShort = monthMapShort[dateParts[1].toLowerCase()] || dateParts[1].substring(0, 3);
+              return `${day} ${monthShort}`;
+            }
+          }
           return date;
         } catch {
           return date;
         }
       })()
     }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+    .sort((a, b) => parseIndonesianToDate(a.date) - parseIndonesianToDate(b.date));
 
   const totalDays = dailyData.length;
   const averageWinners = totalDays > 0 ? (winners.length / totalDays).toFixed(1) : '0';
